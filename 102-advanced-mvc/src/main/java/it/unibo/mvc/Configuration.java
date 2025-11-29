@@ -1,5 +1,9 @@
 package it.unibo.mvc;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import static java.lang.System.err;
 
 /**
  * Encapsulates the concept of configuration.
@@ -38,10 +42,33 @@ public final class Configuration {
     }
 
     /**
-     * @return true if the configuration is consistent
+     * Read the configuration from a file.
+     * 
+     * @return the configuration read
      */
-    public boolean isConsistent() {
-        return attempts > 0 && min < max;
+    public static Configuration fromFile() {
+        Builder readBuilder = new Builder();
+        try (
+            final InputStream configFile = ClassLoader.getSystemResourceAsStream("config.yml");
+            final InputStreamReader reader = new InputStreamReader(configFile);
+            final BufferedReader r = new BufferedReader(reader);
+        ) {
+            String line = null;
+            while( (line = r.readLine()) != null) {
+                String[] values = line.split(":");
+                String key = values[0].trim();
+                int value = Integer.parseInt(values[1].trim());
+                switch (key) {
+                    case "minimum":  readBuilder.setMin(value);      break;
+                    case "maximum":  readBuilder.setMax(value);      break;
+                    case "attempts": readBuilder.setAttempts(value); break;
+                    default: break;
+                }
+            }
+        } catch (Exception e) {
+            err.println("Errore nella lettura della configurazione!");
+        }
+        return readBuilder.build();
     }
 
     /**
@@ -100,11 +127,21 @@ public final class Configuration {
         }
 
         /**
+         * @return true if the configuration is consistent
+         */
+        private boolean isConsistent() {
+            return attempts > 0 && min < max;
+        }
+
+        /**
          * @return a configuration
          */
         public final Configuration build() {
             if (consumed) {
                 throw new IllegalStateException("The builder can only be used once");
+            }
+            if (! this.isConsistent()) {
+                throw new IllegalStateException("The configuration values are not consistent");
             }
             consumed = true;
             return new Configuration(max, min, attempts);
